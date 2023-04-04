@@ -631,28 +631,3 @@ args = SimpleNamespace(
 analyzer = MythrilAnalyzer(disassembler, cmd_args=args)
 justvar = analyzer.fire_lasers(transaction_count=1)
 print(justvar.as_text())
-
-m = ManticoreEVM()
-
-with open("unprotected.sol") as f:
-    source_code = f.read()
-
-# Generate the accounts. Creator has 10 ethers; attacker 0
-creator_account = m.create_account(balance=10*10**18)
-attacker_account = m.create_account(balance=10*10**18)
-contract_account = m.solidity_create_contract(source_code, owner=creator_account)
-
-contract_account.deposit(caller=creator_account, value=10**18)
-# Two raw transactions from the attacker
-symbolic_data = m.make_symbolic_buffer(320)
-m.transaction(caller=attacker_account,address=contract_account,data=symbolic_data,value=0)
-symbolic_data = m.make_symbolic_buffer(320)
-m.transaction(caller=attacker_account,address=contract_account,data=symbolic_data,value=0)
-for state in m.running_states:
-    # Check if the attacker can ends with some ether
-    balance = state.platform.get_balance(attacker_account.address)
-    state.constrain(balance >= 10 * 10 ** 18)
-    if state.is_feasible():
-        print("Attacker can steal the ether! see {}".format(m.workspace))
-        m.generate_testcase(state, 'WalletHack')
-        print(f'Bug found, results are in {m.workspace}')
