@@ -1,8 +1,9 @@
+pragma solidity 0.5.0;
 // Smart contract based on a classic symbolic execution example from slides
 // by Michael Hicks, University of Maryland.
 // https://www.cs.umd.edu/~mwh/se-tutorial/symbolic-exec.pdf
 contract SymExExample {
-pragma solidity 0.5.0;
+
     function test_me(int a, int b, int c) public pure {
         int x = 0;
         int y = 0;
