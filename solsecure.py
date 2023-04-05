@@ -44,12 +44,32 @@ from mythril.exceptions import DetectorNotFoundError
 from mythril.laser.execution_info import ExecutionInfo
 from typing import Optional, List
 import traceback
+from getSolVersion import get_sol_version
+
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-sol", help="something", required=True, default="umd_example.sol")
 args = parser.parse_args()
 
 log = logging.getLogger(__name__)
+m = ManticoreEVM()
+
+#Inputs
+path = subprocess.check_output("pwd", shell=True)
+path = path.decode("utf-8").strip()
+contractfolder = "sol_examples"
+contractfile = "{}/{}/{}".format(path,contractfolder, args.sol)
+exec_time = 5
+onchain_data= True
+parallelsolve = True
+sol_version = get_sol_version(contractfile).strip()
+print(sol_version)
+
+mythriloutput = "mythrilout.txt"
+manticoreoutputdir = "{}".format(m.workspace)
+contract_outpath = "SolSecure_output"
+print(manticoreoutputdir)
 
 def get_contracts_from_foundry(input_file, foundry_json):
     """
@@ -609,19 +629,19 @@ class MythrilAnalyzer:
         return report
 
 
-disassembler = MythrilDisassembler(eth=None, solc_version="v0.5.0")
-disassembler.load_from_solidity(["/home/diganth/{}".format(args.sol)])
+disassembler = MythrilDisassembler(eth=None, solc_version="v{}".format(sol_version))
+disassembler.load_from_solidity(["{}".format(contractfile)])
 args = SimpleNamespace(
-        execution_timeout=5,
+        execution_timeout=exec_time,
         max_depth=30,
         solver_timeout=10000,
-        no_onchain_data=True,
+        no_onchain_data=onchain_data,
         loop_bound=None,
         create_timeout=None,
         disable_dependency_pruning=False,
         custom_modules_directory=None,
         pruning_factor=0,
-        parallel_solving=True,
+        parallel_solving=parallelsolve,
         unconstrained_storage=True,
         call_depth_limit=3,
         enable_iprof=False,
@@ -630,4 +650,32 @@ args = SimpleNamespace(
     )
 analyzer = MythrilAnalyzer(disassembler, cmd_args=args)
 justvar = analyzer.fire_lasers(transaction_count=1)
-print(justvar.as_text())
+mythout = justvar.as_text()
+with open(mythriloutput, "w") as f:
+    f.write(mythout)
+f.close()
+print("Results has been written to {}".format(mythriloutput))
+
+print("# Welcome to Manticore")
+with open("unprotected.sol") as f:
+    source_code = f.read()
+
+# Generate the accounts. Creator has 10 ethers; attacker 0
+creator_account = m.create_account(balance=10*10**18)
+attacker_account = m.create_account(balance=10*10**18)
+contract_account = m.solidity_create_contract(source_code, owner=creator_account)
+
+contract_account.deposit(caller=creator_account, value=10**18)
+# Two raw transactions from the attacker
+symbolic_data = m.make_symbolic_buffer(320)
+m.transaction(caller=attacker_account,address=contract_account,data=symbolic_data,value=0)
+symbolic_data = m.make_symbolic_buffer(320)
+m.transaction(caller=attacker_account,address=contract_account,data=symbolic_data,value=0)
+for state in m.running_states:
+    # Check if the attacker can ends with some ether
+    balance = state.platform.get_balance(attacker_account.address)
+    state.constrain(balance >= 10 * 10 ** 18)
+    if state.is_feasible():
+        print("Attacker can steal the ether! see {}".format(manticoreoutputdir))
+        m.generate_testcase(state, 'WalletHack')
+        print(f'Bug found, results are in {manticoreoutputdir}')
