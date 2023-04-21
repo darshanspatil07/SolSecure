@@ -677,4 +677,4 @@ for state in m.running_states:
     if state.is_feasible():
         print("Attacker can steal the ether! see {}".format(m.workspace))
         m.generate_testcase(state, 'WalletHack')
-        print(f'Bug found, results are in {m.workspace}')   
+        print(f'Bug has been found, results are in {m.workspace}')   
