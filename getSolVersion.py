@@ -13,4 +13,4 @@ if __name__ == "__main__":
     else:
         file_path = sys.argv[1]
         sol_version = get_sol_version(file_path)
-        print(f"The Solidity version used in {file_path} is {sol_version}")
+        print(f"The Solidity version used in this {file_path} is {sol_version}")
